@@ -179,13 +179,6 @@ namespace dsp56k
 		bool initFallback()
 		{
 			m_useMmu = false;
-			if (m_maxSize > 0)
-			{
-				m_fallback.resize(m_maxSize);
-				m_fillFunc(m_fallback.data(), m_maxSize);
-				m_ptr = m_fallback.data();
-				m_size = m_fallback.size();
-			}
 			return false;
 		}
 

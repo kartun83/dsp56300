@@ -103,6 +103,7 @@ namespace dsp56k
 		TInterruptFunc					m_interruptFunc;
 
 		const TJitFunc*					m_jitEntries = nullptr;
+		size_t							m_jitEntriesSize = 0;
 		CCRCache						ccrCache;
 
 #ifdef HAVE_ARM64
@@ -188,7 +189,10 @@ namespace dsp56k
 
 			const auto pc = getPC().toWord();
 			LOGJITPC(pc);
-			m_jitEntries[pc](&reg, pc);
+			if (pc < m_jitEntriesSize) [[likely]]
+				m_jitEntries[pc](&reg, pc);
+			else
+				m_jit.execOob(pc);
 		}
 
 		ASMJIT_FORCE_INLINE void execInterpreter() noexcept
@@ -327,7 +331,7 @@ namespace dsp56k
 		Jit&			getJit							() { return m_jit; }
 		const Jit&		getJit							() const { return m_jit; }
 
-		void			setJitEntries					(const TJitFunc* _funcs)			{ m_jitEntries = _funcs; }
+		void			setJitEntries					(const TJitFunc* _funcs, size_t _size)	{ m_jitEntries = _funcs; m_jitEntriesSize = _size; }
 		const auto&		getJitEntries					() const			{ return m_jitEntries; }
 
 		const auto&		getInterruptFunc				() const			{ return m_interruptFunc; }

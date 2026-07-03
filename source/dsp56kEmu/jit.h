@@ -54,6 +54,7 @@ namespace dsp56k
 		void runCheckPMemWrite(TWord _pc) noexcept;
 		void runCheckPMemWriteAndModeChange(TWord _pc) noexcept;
 		void runCheckModeChange(TWord _pc) noexcept;
+		void execOob(TWord _pc) noexcept;
 
 		const JitConfig& getConfig() const { return m_config; }
 		JitConfig getConfig(TWord _pc) const;
