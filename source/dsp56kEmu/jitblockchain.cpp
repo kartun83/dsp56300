@@ -281,16 +281,25 @@ namespace dsp56k
 	JitBlockRuntimeData* JitBlockChain::getChildBlock(JitBlockRuntimeData* _parent, TWord _pc, bool _allowCreate/* = true*/)
 	{
 		if (!m_jit.getConfig().linkJitBlocks)
+		{
+			ensureFuncSize(_pc);
 			return nullptr;
+		}
 
 		if (_parent)
 			occupyArea(_parent);
 
 		if (m_jit.isVolatileP(_pc))
+		{
+			ensureFuncSize(_pc);
 			return nullptr;
+		}
 
 		if(!_allowCreate && _pc >= m_jitCache.size())
+		{
+			ensureFuncSize(_pc);
 			return nullptr;
+		}
 
 		ensureSize(_pc);
 
@@ -299,8 +308,8 @@ namespace dsp56k
 
 			if (e.block && e.block->getPCFirst() == _pc)
 			{
-				// block is still being generated (circular reference)
-				if (m_jitFuncs[_pc] == nullptr)
+				// block is still being generated (circular reference) — getFunc() is null until finalize() is called
+				if (!e.block->getFunc())
 					return nullptr;
 
 				if (!canBeDefaultExecuted(_pc))

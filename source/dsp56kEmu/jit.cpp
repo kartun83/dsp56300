@@ -139,7 +139,13 @@ namespace dsp56k
 
 	void Jit::create(TWord _pc, bool _execute)
 	{
-		m_currentChain->create(_pc, _execute);
+		// Guard against recursive creation of the same PC (e.g. firmware self-modifying code
+		// invalidating the block while it is being compiled/executed, causing funcCreate to be
+		// called again for the same PC and growing the C stack without bound).
+		thread_local int s_depth = 0;
+		++s_depth;
+		m_currentChain->create(_pc, _execute && s_depth <= 1);
+		--s_depth;
 	}
 
 	void Jit::recreate(TWord _pc)
@@ -340,7 +346,16 @@ namespace dsp56k
 			m_currentChain->setMaxUsedPAddress(m_maxUsedPAddress);
 		}
 
-		m_dsp.setJitEntries(m_currentChain->getFuncs().data());
+		m_dsp.setJitEntries(m_currentChain->getFuncs().data(), m_currentChain->getFuncs().size());
+	}
+
+	void Jit::execOob(const TWord _pc) noexcept
+	{
+		// PC is beyond the current JIT table — grow to cover it, then execute
+		m_currentChain->ensureFuncSize(_pc);
+		const auto& funcs = m_currentChain->getFuncs();
+		m_dsp.setJitEntries(funcs.data(), funcs.size());
+		m_dsp.getJitEntries()[_pc](&m_dsp.regs(), _pc);
 	}
 
 	void Jit::onDebuggerAttached(DebuggerInterface& _debugger) const
@@ -414,7 +429,7 @@ namespace dsp56k
 	{
 		if(&_chain == m_currentChain)
 		{
-			m_dsp.setJitEntries(_chain.getFuncs().data());
+			m_dsp.setJitEntries(_chain.getFuncs().data(), _chain.getFuncs().size());
 		}
 	}
 }

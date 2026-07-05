@@ -82,6 +82,8 @@ namespace dsp56k
 			ensureFuncSize(_maxUsedPAddress);
 		}
 
+		bool ensureFuncSize(size_t _address);
+
 		Jit& getJit() const
 		{
 			return m_jit;
@@ -102,7 +104,6 @@ namespace dsp56k
 		bool isBeingGenerated(const JitBlockRuntimeData* _block) const;
 
 		bool ensureCacheSize(size_t _address);
-		bool ensureFuncSize(size_t _address);
 		bool ensureSize(size_t _address);
 
 		void onFuncsResized() const;

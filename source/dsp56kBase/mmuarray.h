@@ -179,7 +179,6 @@ namespace dsp56k
 		bool initFallback()
 		{
 			m_useMmu = false;
-			// Don't pre-allocate in fallback — grow on demand like current behavior
 			return false;
 		}
 
