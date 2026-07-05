@@ -1459,14 +1459,27 @@ aar0=$000008 aar1=$000000 aar2=$000000 aar3=$000000
 
 	void DSP::op_Wait(const TWord)
 	{
+		uint32_t noProgressCount = 0;
+
 		while(m_pendingInterrupts.empty())
 		{
 			auto delay = perif[0]->getTargetClock();
 
 			if (delay > m_instructions)
+			{
 				delay = std::max(delay - m_instructions, static_cast<uint64_t>(PeripheralsProcessingStepSize));
+				noProgressCount = 0;
+			}
 			else
+			{
 				delay = PeripheralsProcessingStepSize;
+
+				// getTargetClock() should move past m_instructions once execPeripheralsFunc below has run.
+				// If it repeatedly doesn't, we're spinning on the peripheral's clock without making any
+				// progress - the same class of bug as the ESAI frame-sync spinloop that never converged.
+				++noProgressCount;
+				assert(noProgressCount < 4096 && "op_Wait spinning without peripheral clock progress");
+			}
 
 //			LOG("Delay " << delay);
 			m_instructions += delay;
