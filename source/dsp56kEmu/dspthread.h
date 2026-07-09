@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <functional>
 #include <mutex>
 #include <memory>
@@ -41,8 +42,23 @@ namespace dsp56k
 
 		bool runThread() const { return m_runThread; }
 
+		// DIAGNOSTIC ONLY - not a fix. Tests whether voluntarily suspending this
+		// realtime-scheduled thread at all causes audio artifacts, independent of any pacing
+		// decision (see doc/dsp_threading_and_peripherals.md, "What both attempts had in
+		// common"). Remove once the question is answered either way - do not ship.
+		void setDiagnosticSleepEnabled(bool _enabled) { m_diagnosticSleepEnabled = _enabled; }
+		bool getDiagnosticSleepEnabled() const { return m_diagnosticSleepEnabled; }
+
+		// DIAGNOSTIC ONLY. Callable from any thread (e.g. the host audio thread right before
+		// a preset/sysex load). Suppresses the diagnostic sleep for a short cooldown window,
+		// to test whether the crackle is caused by the sleep landing during bursty
+		// HDI08/preset-load activity specifically, rather than by suspending this thread at
+		// all. See doc/dsp_threading_and_peripherals.md, Case study #3.
+		void notifyBurstActivity();
+
 	private:
 		void threadFunc();
+		void diagnosticSleep();
 
 		DSP& m_dsp;
 		const std::string m_name;
@@ -51,6 +67,10 @@ namespace dsp56k
 		std::unique_ptr<std::thread> m_thread;
 
 		bool m_runThread;
+
+		bool m_diagnosticSleepEnabled = false;
+		uint32_t m_diagnosticSleepCounter = 0;
+		std::atomic<int64_t> m_diagnosticSleepSuppressUntilUs{0};
 
 		Callback m_callback;
 

@@ -13,6 +13,14 @@
 
 namespace dsp56k
 {
+	namespace
+	{
+		int64_t nowUs()
+		{
+			return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+		}
+	}
+
 	void defaultCallback(uint32_t)
 	{
 	}
@@ -63,6 +71,35 @@ namespace dsp56k
 		m_runThread = false;
 
 		m_dsp.terminate();
+	}
+
+	void DSPThread::diagnosticSleep()
+	{
+		// DIAGNOSTIC ONLY (see dspthread.h). Sleeps a small FIXED duration gated purely by an
+		// iteration counter - no "how far ahead of real time" computation, no peripheral/JIT
+		// state read or written anywhere. The 1-in-N gating keeps the *average* added overhead
+		// (duration/N per iteration) negligible regardless of voice count/CPU load, so this
+		// can't itself cause a buffer underrun - the only thing under test is whether this
+		// thread being voluntarily suspended and resumed at all causes audio artifacts.
+		constexpr uint32_t everyNIterations = 100;
+		constexpr auto sleepDuration = std::chrono::microseconds(300);
+
+		if (++m_diagnosticSleepCounter % everyNIterations != 0)
+			return;
+
+		if (nowUs() < m_diagnosticSleepSuppressUntilUs.load(std::memory_order_relaxed))
+			return;
+
+		std::this_thread::sleep_for(sleepDuration);
+	}
+
+	void DSPThread::notifyBurstActivity()
+	{
+		// DIAGNOSTIC ONLY (see dspthread.h). 5ms comfortably covers a preset-load HDI08 RX
+		// burst (rate-limited to one word per 200 DSP cycles) plus any firmware-side
+		// voice/filter reinit that follows it.
+		constexpr int64_t cooldownUs = 5000;
+		m_diagnosticSleepSuppressUntilUs.store(nowUs() + cooldownUs, std::memory_order_relaxed);
 	}
 
 	void DSPThread::setCallback(const Callback& _callback)
@@ -152,6 +189,9 @@ namespace dsp56k
 				m_dsp.setDebugger(m_nextDebugger);
 #endif
 			}
+
+			if (m_diagnosticSleepEnabled)
+				diagnosticSleep();
 
 			if((counter & (ipsStep-1)) == 0)
 			{
